@@ -137,12 +137,13 @@ app.get('/api/healthz', (_req: Request, res: Response) => {
 
 // ─── STATIC FILE SERVING ──────────────────────────────────────────────────────
 const staticPath = path.join(__dirname, '../../public');
-app.use(express.static(staticPath));
+app.use(express.static(staticPath, { index: false }));
 
 // ─── PLATFORM GATE ────────────────────────────────────────────────────────────
 app.use('/api/*', (req: Request, res: Response, next: NextFunction) => {
+  const isProd = process.env.NODE_ENV === 'production';
   const platform = req.headers['x-platform'];
-  if (!platform) {
+  if (isProd && !platform) {
     res.status(400).json({
       success: false,
       message: 'Missing platform identifier.'

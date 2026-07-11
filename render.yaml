@@ -48,7 +48,7 @@ services:
         npm run build -w @workspace/admin-portal;
       fi
 
-    startCommand: node --enable-source-maps artifacts/api-server/dist/index.mjs
+    startCommand: node --enable-source-maps artifacts/api-server/dist/index.js
 
     healthCheckPath: /healthz
 
