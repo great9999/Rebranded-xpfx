@@ -5,7 +5,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: infrastructure/docker/Dockerfile
+      dockerfile: Dockerfile
     container_name: xpressprofx-api
     restart: unless-stopped
     ports:
@@ -28,23 +28,6 @@ services:
       retries: 3
       start_period: 40s
 
-  # === Background Worker (BullMQ) ===
-  worker:
-    build:
-      context: .
-      dockerfile: infrastructure/docker/Dockerfile.worker
-    container_name: xpressprofx-worker
-    restart: unless-stopped
-    env_file:
-      - .env.production
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_started
-    networks:
-      - xpressprofx-net
-
   # === PostgreSQL Database ===
   postgres:
     image: postgres:16-alpine
@@ -56,7 +39,6 @@ services:
       POSTGRES_DB: xpressprofx
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./infrastructure/docker/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
       - xpressprofx-net
     healthcheck:
