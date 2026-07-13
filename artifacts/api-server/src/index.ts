@@ -4,6 +4,7 @@ dotenv.config();
 
 import http from 'http';
 import app from './app';
+import { validateProductionEnvironment } from '../../../scripts/validate-production-env.mjs';
 
 type PrismaClientType = {
   $connect: () => Promise<void>;
@@ -41,6 +42,7 @@ async function initDatabase() {
 
 async function bootstrap() {
   try {
+    validateProductionEnvironment(process.env);
     prisma = await initDatabase();
 
     const resolvedPort = normalizePort(process.env.PORT || PORT);
