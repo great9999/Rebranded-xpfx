@@ -4,6 +4,7 @@ dotenv.config();
 
 import http from 'http';
 import app from './app';
+import { validateProductionEnvironment } from '../../../scripts/validate-production-env.mjs';
 
 type PrismaClientType = {
   $connect: () => Promise<void>;
@@ -39,16 +40,9 @@ async function initDatabase() {
   }
 }
 
-function validateRequiredEnv() {
-  const required = ['SESSION_SECRET', 'JWT_SECRET'];
-  const missing = required.filter((k) => !process.env[k]);
-  if (missing.length > 0) {
-    console.warn('[ENV] Missing recommended environment variables:', missing.join(', '));
-  }
-}
-
 async function bootstrap() {
   try {
+    validateProductionEnvironment(process.env);
     prisma = await initDatabase();
 
     const resolvedPort = normalizePort(process.env.PORT || PORT);

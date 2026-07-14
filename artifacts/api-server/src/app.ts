@@ -8,11 +8,19 @@ import rateLimit from 'express-rate-limit';
 import pinoHttp from 'pino-http';
 import fs from 'fs';
 import path from 'path';
+import { randomBytes } from 'crypto';
 import client from 'prom-client';
 import apiRoutes from './routes/index';
 
 const app = express();
 app.disable('x-powered-by');
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const requestId = req.get('x-request-id') || randomBytes(8).toString('hex');
+  req.headers['x-request-id'] = requestId;
+  res.setHeader('x-request-id', requestId);
+  next();
+});
 
 // ─── LOGGING ──────────────────────────────────────────────────────────────────
 app.use(pinoHttp({
@@ -39,7 +47,10 @@ app.use(helmet({
       upgradeInsecureRequests: []
     }
   },
-  crossOriginEmbedderPolicy: false
+  crossOriginEmbedderPolicy: false,
+  strictTransportSecurity: process.env.NODE_ENV === 'production'
+    ? { maxAge: 31536000, includeSubDomains: true, preload: true }
+    : false
 }));
 
 // ─── CORS ─────────────────────────────────────────────────────────────────────
@@ -94,7 +105,7 @@ app.get('/metrics', async (_req: Request, res: Response) => {
   try {
     res.set('Content-Type', client.register.contentType);
     res.end(await client.register.metrics());
-  } catch (err) {
+  } catch {
     res.status(500).send('Failed to collect metrics');
   }
 });
@@ -108,12 +119,12 @@ app.use('/api/webhooks', express.raw({ type: 'application/json' }));
 // ─── BODY PARSERS ─────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
+const sessionSecret = process.env.SESSION_SECRET?.trim() || (process.env.NODE_ENV === 'production' ? undefined : randomBytes(32).toString('hex'));
+if (!sessionSecret) {
   throw new Error(
     'SESSION_SECRET must be set in production. Signed cookies and sessions cannot use a hardcoded fallback secret.'
   );
 }
-const sessionSecret = process.env.SESSION_SECRET || 'xpresspro-fx-secret';
 app.use(cookieParser(sessionSecret));
 
 // ─── SESSION ──────────────────────────────────────────────────────────────────
@@ -164,30 +175,37 @@ app.use('/api/live-chat/', liveChatLimiter);
 app.set('trust proxy', 1);
 
 // ─── HEALTH CHECKS ────────────────────────────────────────────────────────────
-app.get('/healthz', (_req: Request, res: Response) => {
-  res.status(200).json({
-    status: 'ok',
-    service: 'XpressPro FX API',
-    environment: process.env.NODE_ENV || 'development',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
-});
-
-app.get('/api/healthz', (_req: Request, res: Response) => {
-  res.status(200).json({
+function buildHealthPayload(extra: Record<string, unknown> = {}) {
+  return {
     status: 'ok',
     service: 'XpressPro FX API',
     version: '1.0.0',
     environment: process.env.NODE_ENV || 'development',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    memory: process.memoryUsage()
-  });
+    memory: process.memoryUsage(),
+    ...extra
+  };
+}
+
+app.get('/healthz', (_req: Request, res: Response) => {
+  res.status(200).json(buildHealthPayload({ checks: ['process'] }));
 });
 
-// Readiness probe: verifies DB connectivity when DATABASE_URL is configured
-app.get('/readyz', async (_req: Request, res: Response) => {
+app.get('/livez', (_req: Request, res: Response) => {
+  res.status(200).json(buildHealthPayload({ checks: ['process'] }));
+});
+
+app.get('/api/healthz', (_req: Request, res: Response) => {
+  res.status(200).json(buildHealthPayload());
+});
+
+app.get('/api/livez', (_req: Request, res: Response) => {
+  res.status(200).json(buildHealthPayload());
+});
+
+// Readiness probe: verifies DB connectivity when DATABASE_URL is configured.
+async function readinessHandler(_req: Request, res: Response) {
   if (!process.env.DATABASE_URL) {
     return res.status(200).json({ ready: true, reason: 'no-db-config' });
   }
@@ -196,11 +214,14 @@ app.get('/readyz', async (_req: Request, res: Response) => {
     const client = new PrismaClient();
     await client.$connect();
     await client.$disconnect();
-    return res.status(200).json({ ready: true });
+    return res.status(200).json({ ready: true, reason: 'database-ok' });
   } catch (err) {
     return res.status(503).json({ ready: false, error: String(err) });
   }
-});
+}
+
+app.get('/readyz', readinessHandler);
+app.get('/api/readyz', readinessHandler);
 
 // ─── STATIC FILE SERVING ──────────────────────────────────────────────────────
 const candidateRoots = [
@@ -258,6 +279,13 @@ app.use('/api/*', (req: Request, res: Response, next: NextFunction) => {
 
 // ─── API ROUTES ───────────────────────────────────────────────────────────────
 app.use('/api', apiRoutes);
+
+// Ensure any unmatched API request (all methods) returns a JSON 404 instead
+// of Express's default HTML error page. This makes errors consistent for
+// frontend clients and helps debugging missing routes like POST /api/auth/signup.
+app.use('/api', (_req, res) => {
+  return res.status(404).json({ success: false, message: 'Route not found.' });
+});
 
 // ─── SPA FALLBACK ─────────────────────────────────────────────────────────────
 app.get('*', (req: Request, res: Response) => {
