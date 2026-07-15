@@ -8,7 +8,7 @@
 
   "deploy": {
     "startCommand": "node artifacts/api-server/dist/index.mjs",
-    "healthcheckPath": "/readyz",
+    "healthcheckPath": "/healthz",
     "healthcheckTimeout": 60,
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 3
