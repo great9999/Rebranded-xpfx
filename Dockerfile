@@ -4,7 +4,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl libssl1
 WORKDIR /app
 
 FROM base AS deps
-COPY package.json pnpm-lock.yaml .npmrc ./
+COPY package.json .npmrc ./
 COPY artifacts/api-server/package.json ./artifacts/api-server/package.json
 COPY artifacts/nextrade/package.json ./artifacts/nextrade/package.json
 COPY artifacts/admin-portal/package.json ./artifacts/admin-portal/package.json

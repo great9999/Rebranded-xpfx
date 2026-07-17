@@ -8,7 +8,7 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Copy package files for workspaces
-COPY package.json pnpm-lock.yaml* package-lock.json* ./
+COPY package.json package-lock.json* ./
 COPY packages/*/package.json ./packages/
 COPY apps/worker/package.json ./apps/worker/
 RUN npm ci --only=production --ignore-scripts || npm install --production
