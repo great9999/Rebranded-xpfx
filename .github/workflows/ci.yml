@@ -19,7 +19,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci --no-audit --no-fund
+        run: npm ci --legacy-peer-deps --no-audit --no-fund
 
       - name: Generate Prisma client
         run: ./node_modules/.bin/prisma generate
@@ -41,3 +41,6 @@ jobs:
 
       - name: Build Admin Portal
         run: npm run build --workspace=artifacts/admin-portal
+
+      - name: Build API Zod package
+        run: npm run build --workspace=lib/api-zod
