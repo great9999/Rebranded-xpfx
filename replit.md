@@ -1,6 +1,6 @@
-# [Project name]
+# XpressPro FX (Rebranded XPFX)
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A production-ready, enterprise-grade trading platform — wallet management, KYC, deposits/withdrawals, P2P trading, and admin controls. Currently running the boilerplate API shell; full business logic lives in `.migration-backup/` pending migration.
 
 ## Run & Operate
 
